@@ -4,6 +4,7 @@ import requests
 import html2text
 from pathlib import Path
 from dotenv import load_dotenv
+from readability import Document
 from .cache import get_from_cache, write_to_cache
 
 # Load .env file from current directory or user's home
@@ -53,7 +54,21 @@ def fetch_html(url, use_cache=True):
     return html
 
 
-def html_to_markdown(html, ignore_links=False, ignore_images=False):
+def extract_main_content(html):
+    """
+    Extract the main article content from HTML using Readability.
+
+    Args:
+        html: The HTML content to extract from
+
+    Returns:
+        str: The main content HTML (without ads, navigation, etc.)
+    """
+    doc = Document(html)
+    return doc.summary()
+
+
+def html_to_markdown(html, ignore_links=False, ignore_images=False, main_content_only=True):
     """
     Convert HTML to markdown.
 
@@ -61,10 +76,15 @@ def html_to_markdown(html, ignore_links=False, ignore_images=False):
         html: The HTML content to convert
         ignore_links: Whether to ignore links in the output
         ignore_images: Whether to ignore images in the output
+        main_content_only: Whether to extract only main content (default: True)
 
     Returns:
         str: The markdown content
     """
+    # Extract main content if requested
+    if main_content_only:
+        html = extract_main_content(html)
+
     h = html2text.HTML2Text()
     h.ignore_links = ignore_links
     h.ignore_images = ignore_images
@@ -72,13 +92,14 @@ def html_to_markdown(html, ignore_links=False, ignore_images=False):
     return h.handle(html)
 
 
-def url_to_markdown(url, use_cache=True):
+def url_to_markdown(url, use_cache=True, main_content_only=True):
     """
     Convert a URL to markdown in one step.
 
     Args:
         url: The URL to convert
         use_cache: Whether to use cached content if available
+        main_content_only: Whether to extract only main content (default: True)
 
     Returns:
         str: The markdown content
@@ -87,4 +108,4 @@ def url_to_markdown(url, use_cache=True):
         requests.exceptions.RequestException: If the request fails
     """
     html = fetch_html(url, use_cache=use_cache)
-    return html_to_markdown(html)
+    return html_to_markdown(html, main_content_only=main_content_only)
