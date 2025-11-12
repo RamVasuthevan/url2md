@@ -1,0 +1,28 @@
+[project]
+name = "url2md"
+version = "0.1"
+description = "Get the markdown representation of the contents of a url"
+readme = "README.md"
+authors = [{name = "Ram Vasuthevan"}]
+license = "Apache-2.0"
+requires-python = ">=3.10"
+classifiers = []
+dependencies = [
+    "click"
+]
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project.urls]
+Homepage = "https://github.com/RamVasuthevan/url2md"
+Changelog = "https://github.com/RamVasuthevan/url2md/releases"
+Issues = "https://github.com/RamVasuthevan/url2md/issues"
+CI = "https://github.com/RamVasuthevan/url2md/actions"
+
+[project.scripts]
+url2md = "url2md.cli:cli"
+
+[project.optional-dependencies]
+test = ["pytest"]
