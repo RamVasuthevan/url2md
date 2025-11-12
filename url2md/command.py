@@ -4,8 +4,14 @@ import requests
 import html2text
 from pathlib import Path
 from dotenv import load_dotenv
-from readability import Document
 from .cache import get_from_cache, write_to_cache
+from .extractor import (
+    Extractor,
+    ReadabilityExtractor,
+    NewspaperExtractor,
+    ArticleMetadata,
+    ArticleContent
+)
 
 # Load .env file from current directory or user's home
 load_dotenv()
@@ -54,58 +60,84 @@ def fetch_html(url, use_cache=True):
     return html
 
 
-def extract_main_content(html):
+def get_extractor(extractor_type: str = "readability") -> Extractor:
     """
-    Extract the main article content from HTML using Readability.
+    Get an extractor instance by type.
 
     Args:
-        html: The HTML content to extract from
+        extractor_type: "readability" or "newspaper"
 
     Returns:
-        str: The main content HTML (without ads, navigation, etc.)
+        Extractor instance
+
+    Raises:
+        ValueError: If extractor_type is not recognized
     """
-    doc = Document(html)
-    return doc.summary()
+    if extractor_type == "readability":
+        return ReadabilityExtractor()
+    elif extractor_type == "newspaper":
+        return NewspaperExtractor()
+    else:
+        raise ValueError(f"Unknown extractor: {extractor_type}. Use 'readability' or 'newspaper'")
 
 
-def html_to_markdown(html, ignore_links=False, ignore_images=False, main_content_only=True):
+def html_to_markdown(html, url="", extractor_type="readability",
+                     ignore_links=False, ignore_images=False):
     """
-    Convert HTML to markdown.
+    Convert HTML to markdown using the specified extractor.
 
     Args:
         html: The HTML content to convert
+        url: URL of the page (used for metadata extraction)
+        extractor_type: "readability" or "newspaper" (default: "readability")
         ignore_links: Whether to ignore links in the output
         ignore_images: Whether to ignore images in the output
-        main_content_only: Whether to extract only main content (default: True)
 
     Returns:
-        str: The markdown content
+        str: The markdown content with metadata formatted by the extractor
     """
-    # Extract main content if requested
-    if main_content_only:
-        html = extract_main_content(html)
+    # Get the extractor
+    extractor = get_extractor(extractor_type)
 
+    # Extract content and metadata
+    article = extractor.extract(html, url)
+
+    markdown_parts = []
+
+    # Extractor formats its own metadata
+    metadata_md = extractor.format_metadata(article.metadata)
+    if metadata_md:
+        markdown_parts.append(metadata_md)
+
+    # Convert HTML to markdown
     h = html2text.HTML2Text()
     h.ignore_links = ignore_links
     h.ignore_images = ignore_images
 
-    return h.handle(html)
+    content_md = h.handle(article.html)
+    markdown_parts.append(content_md)
+
+    return "\n".join(markdown_parts)
 
 
-def url_to_markdown(url, use_cache=True, main_content_only=True):
+def url_to_markdown(url, use_cache=True, extractor_type="readability"):
     """
     Convert a URL to markdown in one step.
+
+    The extractor automatically handles metadata formatting:
+    - ReadabilityExtractor: includes title
+    - NewspaperExtractor: includes title, author, and date
 
     Args:
         url: The URL to convert
         use_cache: Whether to use cached content if available
-        main_content_only: Whether to extract only main content (default: True)
+        extractor_type: "readability" or "newspaper" (default: "readability")
 
     Returns:
-        str: The markdown content
+        str: The markdown content with metadata
 
     Raises:
         requests.exceptions.RequestException: If the request fails
     """
     html = fetch_html(url, use_cache=use_cache)
-    return html_to_markdown(html, main_content_only=main_content_only)
+    return html_to_markdown(html, url=url, extractor_type=extractor_type)

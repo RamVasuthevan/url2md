@@ -12,7 +12,8 @@ dependencies = [
     "requests",
     "html2text",
     "python-dotenv",
-    "readability-lxml"
+    "readability-lxml",
+    "newspaper3k"
 ]
 
 [build-system]
