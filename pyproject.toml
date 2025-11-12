@@ -10,7 +10,8 @@ classifiers = []
 dependencies = [
     "click",
     "requests",
-    "html2text"
+    "html2text",
+    "python-dotenv"
 ]
 
 [build-system]
