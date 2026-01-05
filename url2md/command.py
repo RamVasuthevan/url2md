@@ -1,72 +1,145 @@
+"""Core command functions for url2md"""
+
 import requests
-from typing import Optional
-from .cache import read_from_cache, write_to_cache
+import html2text
+from pathlib import Path
+from dotenv import load_dotenv
+from .cache import get_from_cache, write_to_cache
+from .extractor import (
+    Extractor,
+    ReadabilityExtractor,
+    NewspaperExtractor,
+    ArticleMetadata,
+    ArticleContent
+)
+
+# Load .env file from current directory or user's home
+load_dotenv()
+load_dotenv(Path.home() / ".env")
+
+# Constants
+USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+REQUEST_TIMEOUT = 30
 
 
-def fetch_url(url: str) -> str:
+def fetch_html(url, use_cache_read=True, use_cache_write=True):
     """
-    Fetch the content of a URL.
+    Fetch HTML content from a URL.
 
     Args:
         url: The URL to fetch
+        use_cache_read: Whether to read from cached content if available
+        use_cache_write: Whether to write fetched content to cache
 
     Returns:
-        The HTML content of the URL
+        str: The HTML content
 
     Raises:
-        requests.RequestException: If the request fails
+        requests.exceptions.RequestException: If the request fails
     """
-    response = requests.get(url, timeout=30)
+    # Add https:// if not present
+    if not url.startswith(("http://", "https://")):
+        url = f"https://{url}"
+
+    # Check cache first
+    if use_cache_read:
+        cached_html = get_from_cache(url)
+        if cached_html:
+            return cached_html
+
+    # Fetch from URL
+    headers = {"User-Agent": USER_AGENT}
+    response = requests.get(url, headers=headers, timeout=REQUEST_TIMEOUT)
     response.raise_for_status()
-    return response.text
 
+    html = response.text
 
-def html_to_markdown(html: str) -> str:
-    """
-    Convert HTML content to markdown.
+    # Save to cache
+    if use_cache_write:
+        write_to_cache(url, html)
 
-    Args:
-        html: The HTML content to convert
-
-    Returns:
-        The markdown representation of the HTML
-
-    Note:
-        This is a placeholder. Consider using a library like html2text or markdownify
-    """
-    # TODO: Implement actual HTML to markdown conversion
-    # For now, return the HTML as-is
     return html
 
 
-def convert_url_to_markdown(
-    url: str,
-    use_cache_read: bool = True,
-    use_cache_write: bool = True,
-) -> str:
+def get_extractor(extractor_type: str = "readability") -> Extractor:
     """
-    Convert a URL to markdown, optionally using cache.
+    Get an extractor instance by type.
+
+    Args:
+        extractor_type: "readability" or "newspaper"
+
+    Returns:
+        Extractor instance
+
+    Raises:
+        ValueError: If extractor_type is not recognized
+    """
+    if extractor_type == "readability":
+        return ReadabilityExtractor()
+    elif extractor_type == "newspaper":
+        return NewspaperExtractor()
+    else:
+        raise ValueError(f"Unknown extractor: {extractor_type}. Use 'readability' or 'newspaper'")
+
+
+def html_to_markdown(html, url="", extractor_type="readability",
+                     ignore_links=False, ignore_images=False):
+    """
+    Convert HTML to markdown using the specified extractor.
+
+    Args:
+        html: The HTML content to convert
+        url: URL of the page (used for metadata extraction)
+        extractor_type: "readability" or "newspaper" (default: "readability")
+        ignore_links: Whether to ignore links in the output
+        ignore_images: Whether to ignore images in the output
+
+    Returns:
+        str: The markdown content with metadata formatted by the extractor
+    """
+    # Get the extractor
+    extractor = get_extractor(extractor_type)
+
+    # Extract content and metadata
+    article = extractor.extract(html, url)
+
+    markdown_parts = []
+
+    # Extractor formats its own metadata
+    metadata_md = extractor.format_metadata(article.metadata)
+    if metadata_md:
+        markdown_parts.append(metadata_md)
+
+    # Convert HTML to markdown
+    h = html2text.HTML2Text()
+    h.ignore_links = ignore_links
+    h.ignore_images = ignore_images
+
+    content_md = h.handle(article.html)
+    markdown_parts.append(content_md)
+
+    return "\n".join(markdown_parts)
+
+
+def url_to_markdown(url, use_cache_read=True, use_cache_write=True, extractor_type="readability"):
+    """
+    Convert a URL to markdown in one step.
+
+    The extractor automatically handles metadata formatting:
+    - ReadabilityExtractor: includes title
+    - NewspaperExtractor: includes title, author, and date
 
     Args:
         url: The URL to convert
-        use_cache_read: Whether to read from cache if available
-        use_cache_write: Whether to write the result to cache
+        use_cache_read: Whether to read from cached content if available
+        use_cache_write: Whether to write fetched content to cache
+        extractor_type: "readability" or "newspaper" (default: "readability")
 
     Returns:
-        The markdown representation of the URL content
+        str: The markdown content with metadata
+
+    Raises:
+        requests.exceptions.RequestException: If the request fails
     """
-    # Try to read from cache first if enabled
-    if use_cache_read:
-        cached_content = read_from_cache(url)
-        if cached_content:
-            return cached_content
-
-    # Fetch and convert the URL
-    html = fetch_url(url)
-    markdown = html_to_markdown(html)
-
-    # Write to cache if enabled
-    if use_cache_write:
-        write_to_cache(url, markdown)
-
-    return markdown
+    html = fetch_html(url, use_cache_read=use_cache_read, use_cache_write=use_cache_write)
+    return html_to_markdown(html, url=url, extractor_type=extractor_type)

@@ -1,3 +1,5 @@
+"""Cache management for url2md"""
+
 import hashlib
 import os
 from pathlib import Path
@@ -5,8 +7,15 @@ from typing import Optional
 
 
 def get_cache_dir() -> Path:
-    """Get or create the cache directory."""
-    cache_dir = Path.home() / ".cache" / "url2md"
+    """Get the cache directory path from environment variable or default."""
+    cache_path = os.getenv("URL2MD_CACHE_DIR")
+
+    if cache_path:
+        cache_dir = Path(cache_path).expanduser()
+    else:
+        import tempfile
+        cache_dir = Path(tempfile.gettempdir()) / "url2md"
+
     cache_dir.mkdir(parents=True, exist_ok=True)
     return cache_dir
 
@@ -16,39 +25,55 @@ def get_cache_key(url: str) -> str:
     return hashlib.sha256(url.encode()).hexdigest()
 
 
-def get_cache_path(url: str) -> Path:
-    """Get the cache file path for a given URL."""
-    cache_dir = get_cache_dir()
-    cache_key = get_cache_key(url)
-    return cache_dir / f"{cache_key}.md"
-
-
-def read_from_cache(url: str) -> Optional[str]:
+def is_cached(url: str) -> bool:
     """
-    Read cached markdown content for a URL.
+    Check if a URL's content is in the cache.
 
     Args:
-        url: The URL to look up in the cache
+        url: The URL to check
 
     Returns:
-        The cached markdown content if it exists, None otherwise
+        bool: True if cached, False otherwise
     """
-    cache_path = get_cache_path(url)
-    if cache_path.exists():
-        return cache_path.read_text(encoding="utf-8")
-    return None
+    cache_dir = get_cache_dir()
+    cache_key = get_cache_key(url)
+    cache_file = cache_dir / cache_key
+
+    return cache_file.exists()
 
 
-def write_to_cache(url: str, content: str) -> None:
+def get_from_cache(url: str) -> Optional[str]:
     """
-    Write markdown content to the cache for a URL.
+    Get HTML content from cache if it exists.
 
     Args:
-        url: The URL to cache content for
-        content: The markdown content to cache
+        url: The URL to look up in cache
+
+    Returns:
+        str or None: The cached HTML content, or None if not found
     """
-    cache_path = get_cache_path(url)
-    cache_path.write_text(content, encoding="utf-8")
+    if not is_cached(url):
+        return None
+
+    cache_dir = get_cache_dir()
+    cache_key = get_cache_key(url)
+    cache_file = cache_dir / cache_key
+
+    return cache_file.read_text(encoding='utf-8')
+
+
+def write_to_cache(url: str, html: str) -> None:
+    """
+    Write HTML content to cache.
+
+    Args:
+        url: The URL to use as cache key
+        html: The HTML content to cache
+    """
+    cache_dir = get_cache_dir()
+    cache_key = get_cache_key(url)
+    cache_file = cache_dir / cache_key
+    cache_file.write_text(html, encoding='utf-8')
 
 
 def delete_from_cache(url: str) -> None:
@@ -58,6 +83,16 @@ def delete_from_cache(url: str) -> None:
     Args:
         url: The URL to remove from the cache
     """
-    cache_path = get_cache_path(url)
-    if cache_path.exists():
-        cache_path.unlink()
+    cache_dir = get_cache_dir()
+    cache_key = get_cache_key(url)
+    cache_file = cache_dir / cache_key
+    if cache_file.exists():
+        cache_file.unlink()
+
+
+def clear_cache() -> None:
+    """Clear all cached content."""
+    cache_dir = get_cache_dir()
+    for cache_file in cache_dir.glob("*"):
+        if cache_file.is_file():
+            cache_file.unlink()

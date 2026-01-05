@@ -8,7 +8,12 @@ license = "Apache-2.0"
 requires-python = ">=3.10"
 classifiers = []
 dependencies = [
-    "click"
+    "click",
+    "requests",
+    "html2text",
+    "python-dotenv",
+    "readability-lxml",
+    "newspaper3k"
 ]
 
 [build-system]

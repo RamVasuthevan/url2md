@@ -1,5 +1,9 @@
+"""CLI interface for url2md"""
+
 import click
-from .command import convert_url_to_markdown
+import sys
+import requests
+from .command import url_to_markdown
 
 
 @click.command()
@@ -14,16 +18,31 @@ from .command import convert_url_to_markdown
     default=True,
     help="Write result to cache (default: True)",
 )
+@click.option(
+    "--extractor",
+    type=click.Choice(["readability", "newspaper"], case_sensitive=False),
+    default="readability",
+    help="Extraction method: readability (default, title only) or newspaper (title, author, date)",
+)
 @click.version_option()
-def cli(url: str, read_from_cache: bool, write_to_cache: bool):
-    """Get the markdown representation of the contents of a URL"""
+def cli(url, read_from_cache, write_to_cache, extractor):
+    """Get the markdown representation of the contents of a url"""
+
     try:
-        content = convert_url_to_markdown(
+        # Convert URL to markdown
+        markdown = url_to_markdown(
             url,
             use_cache_read=read_from_cache,
             use_cache_write=write_to_cache,
+            extractor_type=extractor
         )
-        click.echo(content)
-    except Exception as e:
+
+        # Output markdown to stdout
+        click.echo(markdown)
+
+    except requests.exceptions.RequestException as e:
+        click.echo(f"Error fetching URL: {e}", err=True)
+        sys.exit(1)
+    except ValueError as e:
         click.echo(f"Error: {e}", err=True)
-        raise click.Abort()
+        sys.exit(1)
