@@ -9,9 +9,14 @@ from .command import url_to_markdown
 @click.command()
 @click.argument("url")
 @click.option(
-    "--no-cache",
-    is_flag=True,
-    help="Don't use cached content, fetch fresh from URL",
+    "--read-from-cache/--no-read-from-cache",
+    default=True,
+    help="Read from cache if available (default: True)",
+)
+@click.option(
+    "--write-to-cache/--no-write-to-cache",
+    default=True,
+    help="Write result to cache (default: True)",
 )
 @click.option(
     "--extractor",
@@ -20,12 +25,17 @@ from .command import url_to_markdown
     help="Extraction method: readability (default, title only) or newspaper (title, author, date)",
 )
 @click.version_option()
-def cli(url, no_cache, extractor):
+def cli(url, read_from_cache, write_to_cache, extractor):
     """Get the markdown representation of the contents of a url"""
 
     try:
         # Convert URL to markdown
-        markdown = url_to_markdown(url, use_cache=not no_cache, extractor_type=extractor)
+        markdown = url_to_markdown(
+            url,
+            use_cache_read=read_from_cache,
+            use_cache_write=write_to_cache,
+            extractor_type=extractor
+        )
 
         # Output markdown to stdout
         click.echo(markdown)

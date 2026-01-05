@@ -22,13 +22,14 @@ USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
 REQUEST_TIMEOUT = 30
 
 
-def fetch_html(url, use_cache=True):
+def fetch_html(url, use_cache_read=True, use_cache_write=True):
     """
     Fetch HTML content from a URL.
 
     Args:
         url: The URL to fetch
-        use_cache: Whether to use cached content if available
+        use_cache_read: Whether to read from cached content if available
+        use_cache_write: Whether to write fetched content to cache
 
     Returns:
         str: The HTML content
@@ -41,7 +42,7 @@ def fetch_html(url, use_cache=True):
         url = f"https://{url}"
 
     # Check cache first
-    if use_cache:
+    if use_cache_read:
         cached_html = get_from_cache(url)
         if cached_html:
             return cached_html
@@ -54,7 +55,7 @@ def fetch_html(url, use_cache=True):
     html = response.text
 
     # Save to cache
-    if use_cache:
+    if use_cache_write:
         write_to_cache(url, html)
 
     return html
@@ -120,7 +121,7 @@ def html_to_markdown(html, url="", extractor_type="readability",
     return "\n".join(markdown_parts)
 
 
-def url_to_markdown(url, use_cache=True, extractor_type="readability"):
+def url_to_markdown(url, use_cache_read=True, use_cache_write=True, extractor_type="readability"):
     """
     Convert a URL to markdown in one step.
 
@@ -130,7 +131,8 @@ def url_to_markdown(url, use_cache=True, extractor_type="readability"):
 
     Args:
         url: The URL to convert
-        use_cache: Whether to use cached content if available
+        use_cache_read: Whether to read from cached content if available
+        use_cache_write: Whether to write fetched content to cache
         extractor_type: "readability" or "newspaper" (default: "readability")
 
     Returns:
@@ -139,5 +141,5 @@ def url_to_markdown(url, use_cache=True, extractor_type="readability"):
     Raises:
         requests.exceptions.RequestException: If the request fails
     """
-    html = fetch_html(url, use_cache=use_cache)
+    html = fetch_html(url, use_cache_read=use_cache_read, use_cache_write=use_cache_write)
     return html_to_markdown(html, url=url, extractor_type=extractor_type)
